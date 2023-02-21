@@ -1,13 +1,13 @@
 # ASDfR
 repository for Advanched Software Development for Robotics
 
+
+# Assignment 1.1
 // Terminal 1 in the main ASDfR/Ass1 directory
 colcon build --packages-select image_processing
 
-
 // Terminal 2
 ros2 run image_tools cam2image --ros-args -p depth:=1 -p history:=keep_last
-
 
 // Terminal 3 in the main ASDfR/Ass1 directory
 . install/local_setup.bash
