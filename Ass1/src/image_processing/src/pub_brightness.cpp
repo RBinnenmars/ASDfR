@@ -35,7 +35,8 @@ public:
   {
     subscription_ = this->create_subscription<sensor_msgs::msg::Image>(
       "image", 10, std::bind(&ImageSubscriber::image_callback, this, _1));
-      this->declare_parameter("threshold",128);
+      BrightnessThreshold = this->declare_parameter("threshold",128);
+      Assignment = this->declare_parameter("assignment",2);
   }
 
 private:
@@ -43,32 +44,32 @@ private:
   {
     // Convert the ROS image message to an OpenCV image
     cv::Mat cv_image = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8)->image;
-    auto BrightnessThreshold = get_parameter("threshold").as_int();
     
     cv::cvtColor(cv_image, cv_image, cv::COLOR_BGR2GRAY);
-    cv::threshold(cv_image,cv_image,BrightnessThreshold,255,cv::THRESH_BINARY);
 
-    cv::Moments moments = cv::moments(cv_image, true);
+    if (Assignment == 4)
+    {
+      cv::threshold(cv_image,cv_image,BrightnessThreshold,255,cv::THRESH_BINARY);
 
-    // Calculate the centroid of the binary image (i.e., center of gravity of white pixels)
-    double cx = moments.m10 / moments.m00;
-    double cy = moments.m01 / moments.m00;
-    
-    // Section for Assigment 1.1.2 and 1.1.3
-    // double brightness = cv::mean(cv_image)[0];
-    // if (brightness < BrightnessThreshold)
-    // {
-    //     BrightnessBool = false;
-    // }
-    // else
-    // {
-    //     BrightnessBool = true;
-    // }
+      cv::Moments moments = cv::moments(cv_image, true);
 
-    
-    // RCLCPP_INFO(this->get_logger(), "Image brightness is:%f, and bool is: %d", brightness,BrightnessBool);
-    
-    RCLCPP_INFO(this->get_logger(), "The COG is (%.0f,%.0f)", cx,cy);
+      // Calculate the middle of the binary image, COG of white pixels
+      double cx = moments.m10 / moments.m00;
+      double cy = moments.m01 / moments.m00;
+      RCLCPP_INFO(this->get_logger(), "The COG is (%.0f,%.0f)", cx,cy);
+    }
+    else{ // Section for Assigment 1.1.2 and 1.1.3
+      double brightness = cv::mean(cv_image)[0];
+      if (brightness < BrightnessThreshold)
+      {
+          BrightnessBool = false;
+      }
+      else
+      {
+          BrightnessBool = true;
+      }
+      RCLCPP_INFO(this->get_logger(), "Image brightness is:%f, and bool is: %d", brightness,BrightnessBool);
+    }
     // Display the OpenCV image
     cv::imshow("Received Image", cv_image);
     cv::waitKey(1);
@@ -76,6 +77,8 @@ private:
 
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subscription_;
   bool BrightnessBool = false;
+  int BrightnessThreshold;
+  int Assignment;
 };
 
 int main(int argc, char ** argv)
