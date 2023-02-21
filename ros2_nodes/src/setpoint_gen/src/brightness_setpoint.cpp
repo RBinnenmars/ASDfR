@@ -19,6 +19,8 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
+#include "std_msgs/msg/string.hpp"
+#include "asdfr_interfaces/msg/point2.hpp" // 2D point (x and y coordinates)
 
 #include "opencv2/core/mat.hpp"
 #include "opencv2/imgcodecs.hpp"
@@ -28,15 +30,20 @@
 
 using std::placeholders::_1;
 
-class ImageSubscriber : public rclcpp::Node
+using namespace std::chrono_literals;
+
+class BrightnessSetpoint : public rclcpp::Node
 {
 public:
-  ImageSubscriber() : Node("image_subscriber")
+  BrightnessSetpoint() : Node("brightness_setpoint")
   {
     subscription_ = this->create_subscription<sensor_msgs::msg::Image>(
-      "image", 10, std::bind(&ImageSubscriber::image_callback, this, _1));
-      BrightnessThreshold = this->declare_parameter("threshold",128);
-      Assignment = this->declare_parameter("assignment",2);
+     "moving_camera_output", 10, std::bind(&BrightnessSetpoint::image_callback, this, _1));
+    publisher_ = this->create_publisher<asdfr_interfaces::msg::Point2>("setpoint", 10);
+    timer_ = this->create_wall_timer(500ms, std::bind(&BrightnessSetpoint::timer_callback, this));
+
+    // parameter to set the brightness threshold while starting the node
+    BrightnessThreshold = this->declare_parameter("threshold",128);
   }
 
 private:
@@ -44,48 +51,52 @@ private:
   {
     // Convert the ROS image message to an OpenCV image
     cv::Mat cv_image = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8)->image;
-    
     cv::cvtColor(cv_image, cv_image, cv::COLOR_BGR2GRAY);
+    cv::threshold(cv_image,cv_image,BrightnessThreshold,255,cv::THRESH_BINARY);
+    cv::Moments moments = cv::moments(cv_image, true);
 
-    if (Assignment == 4)
-    {
-      cv::threshold(cv_image,cv_image,BrightnessThreshold,255,cv::THRESH_BINARY);
-      cv::Moments moments = cv::moments(cv_image, true);
+    // Calculate the middle of the binary image, COG of white pixels
+    if (moments.m00 != 0){
       double i_width = cv_image.size[1];  // 320
       double i_height = cv_image.size[0]; // 240
 
       // Calculate the middle of the binary image, COG of white pixels with bottem left beign -x,-y
-      double cx = (moments.m10 / moments.m00)-i_width/2;
-      double cy = -(moments.m01 / moments.m00)+i_height/2;
-      RCLCPP_INFO(this->get_logger(), "The COG is (%.0f,%.0f), Width is (%.0f,%.0f)", cx,cy,i_width,i_height);
-    }
-    else{ // Section for Assigment 1.1.2 and 1.1.3
-      double brightness = cv::mean(cv_image)[0];
-      if (brightness < BrightnessThreshold)
-      {
-          BrightnessBool = false;
-      }
-      else
-      {
-          BrightnessBool = true;
-      }
-      RCLCPP_INFO(this->get_logger(), "Image brightness is:%f, and bool is: %d", brightness,BrightnessBool);
-    }
+      cx = (moments.m10 / moments.m00)/i_width-0.5;
+      cy = -(moments.m01 / moments.m00)/i_height+0.5;
+    }else{
+        cx = 0.0;
+        cy = 0.0;
+    } 
+    RCLCPP_INFO(this->get_logger(), "The COG is (%.0f,%.0f)", cx,cy);
+    
     // Display the OpenCV image
-    cv::imshow("Received Image", cv_image);
-    cv::waitKey(1);
+    // cv::imshow("Received Image", cv_image);
+    // cv::waitKey(1);
+  }
+
+  void timer_callback()
+  {
+    auto message = asdfr_interfaces::msg::Point2();
+    message.x = cx;
+    message.y = cy;
+
+    RCLCPP_INFO(this->get_logger(), "Publishing: x='%.1f', y='%.1f'", cx, cy);
+    publisher_->publish(message);
   }
 
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subscription_;
-  bool BrightnessBool = false;
+  rclcpp::Publisher<asdfr_interfaces::msg::Point2>::SharedPtr publisher_;
+  rclcpp::TimerBase::SharedPtr timer_;
   int BrightnessThreshold;
   int Assignment;
+  double cx;
+  double cy;
 };
 
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<ImageSubscriber>();
+  auto node = std::make_shared<BrightnessSetpoint>();
   rclcpp::spin(node);
   rclcpp::shutdown();
   return 0;

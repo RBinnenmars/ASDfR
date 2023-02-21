@@ -22,9 +22,18 @@ find_package(image_transport REQUIRED)
 add_executable(sub_moving src/sub_moving_camera_output.cpp)
 ament_target_dependencies(sub_moving 
   rclcpp 
-  std_msgs
+  sensor_msgs
   OpenCV
   cv_bridge)
+
+add_executable(brightness_setpoint src/brightness_setpoint.cpp)
+ament_target_dependencies(brightness_setpoint 
+  rclcpp 
+  std_msgs
+  sensor_msgs
+  OpenCV
+  cv_bridge
+  asdfr_interfaces)
 
 add_executable(setpoint_gen src/setpoint_generator.cpp)
 ament_target_dependencies(setpoint_gen 
@@ -35,6 +44,10 @@ ament_target_dependencies(setpoint_gen
 install(TARGETS
   setpoint_gen
   sub_moving
+  brightness_setpoint
   DESTINATION lib/${PROJECT_NAME})
+
+
+
 
 ament_package()
