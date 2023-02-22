@@ -38,7 +38,7 @@ public:
   BrightnessSetpoint() : Node("brightness_setpoint")
   {
     subscription_ = this->create_subscription<sensor_msgs::msg::Image>(
-     "moving_camera_output", 10, std::bind(&BrightnessSetpoint::image_callback, this, _1));
+     "image", 10, std::bind(&BrightnessSetpoint::image_callback, this, _1));
     publisher_ = this->create_publisher<asdfr_interfaces::msg::Point2>("setpoint", 10);
     timer_ = this->create_wall_timer(500ms, std::bind(&BrightnessSetpoint::timer_callback, this));
 
@@ -60,10 +60,10 @@ private:
       double i_width = cv_image.size[1];  // 320
       double i_height = cv_image.size[0]; // 240
 
-      // Calculate the middle of the binary image, COG of white pixels with bottem left beign -x,-y
-      cx = (moments.m10 / moments.m00)/i_width-0.5;
-      cy = -(moments.m01 / moments.m00)/i_height+0.5;
-    }else{
+      // Calculate the middle of the binary image, COG of white pixels with bottem left beign -x,-y and convert it to the max radians
+      cx = 0.8*((moments.m10 / moments.m00)-i_width/2)/(i_width/2);
+      cy = 0.6*(-(moments.m01 / moments.m00)+i_height/2)/(i_height/2);
+    }else{ // momentsss.m00 can be 0 this would give nan value
         cx = 0.0;
         cy = 0.0;
     } 
