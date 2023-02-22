@@ -19,6 +19,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
+#include "std_msgs/msg/string.hpp"
 
 #include "opencv2/core/mat.hpp"
 #include "opencv2/imgcodecs.hpp"
@@ -28,6 +29,7 @@
 
 using std::placeholders::_1;
 
+using namespace std::chrono_literals;
 class ImageSubscriber : public rclcpp::Node
 {
 public:
@@ -35,11 +37,34 @@ public:
   {
     subscription_ = this->create_subscription<sensor_msgs::msg::Image>(
       "image", 10, std::bind(&ImageSubscriber::image_callback, this, _1));
-      BrightnessThreshold = this->declare_parameter("threshold",128);
-      Assignment = this->declare_parameter("assignment",2);
+    bright_publisher_ = this->create_publisher<std_msgs::msg::String>("bright", 10);
+    timer_ = this->create_wall_timer(
+      500ms, std::bind(&ImageSubscriber::timer_callback, this));
+    BrightnessThreshold = this->declare_parameter("threshold",128);
+    Assignment = this->declare_parameter("assignment",2);
   }
 
 private:
+   void timer_callback()
+   {
+      auto message = std_msgs::msg::String();
+      if (Assignment == 4) 
+      {
+        message.data = "the centre is (" + std::to_string(cx) + "," + std::to_string(cy) + ")";
+      }else{
+        if (BrightnessBool)
+        {
+          message.data = "The image is Bright";
+        }else{
+          message.data = "The image is NOT Bright";
+        }
+      }
+
+      RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", message.data.c_str());
+      bright_publisher_->publish(message);
+   }
+
+
   void image_callback(const sensor_msgs::msg::Image::SharedPtr msg)
   {
     // Convert the ROS image message to an OpenCV image
@@ -55,9 +80,9 @@ private:
       double i_height = cv_image.size[0]; // 240
 
       // Calculate the middle of the binary image, COG of white pixels with bottem left beign -x,-y
-      double cx = (moments.m10 / moments.m00)-i_width/2;
-      double cy = -(moments.m01 / moments.m00)+i_height/2;
-      RCLCPP_INFO(this->get_logger(), "The COG is (%.0f,%.0f), Width is (%.0f,%.0f)", cx,cy,i_width,i_height);
+      cx = (moments.m10 / moments.m00)-i_width/2;
+      cy = -(moments.m01 / moments.m00)+i_height/2;
+      RCLCPP_INFO(this->get_logger(), "The COG is (%.0f,%.0f)", cx,cy);
     }
     else{ // Section for Assigment 1.1.2 and 1.1.3
       double brightness = cv::mean(cv_image)[0];
@@ -69,17 +94,21 @@ private:
       {
           BrightnessBool = true;
       }
-      RCLCPP_INFO(this->get_logger(), "Image brightness is:%f, and bool is: %d", brightness,BrightnessBool);
+      RCLCPP_INFO(this->get_logger(), "Image brightness is:%f, the threshold is: %d and bool is: %d", brightness,BrightnessThreshold,BrightnessBool);
     }
-    // Display the OpenCV image
+    // Display the OpenCV image?
     cv::imshow("Received Image", cv_image);
     cv::waitKey(1);
   }
 
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subscription_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr bright_publisher_;
+  rclcpp::TimerBase::SharedPtr timer_;
   bool BrightnessBool = false;
   int BrightnessThreshold;
   int Assignment;
+  double cx;
+  double cy;
 };
 
 int main(int argc, char ** argv)

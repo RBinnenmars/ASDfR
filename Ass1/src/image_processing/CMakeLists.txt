@@ -22,11 +22,18 @@ add_executable(pub_brightness src/pub_brightness.cpp)
 ament_target_dependencies(pub_brightness 
   rclcpp 
   sensor_msgs 
+  std_msgs
   OpenCV
   cv_bridge)
 
+add_executable(sub_brightness src/sub_brightness.cpp)
+ament_target_dependencies(sub_brightness 
+  rclcpp 
+  std_msgs)
+
 install(TARGETS
   pub_brightness
+  sub_brightness
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
