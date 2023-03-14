@@ -61,6 +61,8 @@ private:
 
   void image_callback(const sensor_msgs::msg::Image::SharedPtr msg)
   {
+    BrightnessThreshold = this->get_parameter("threshold").get_parameter_value().get<int>();
+
     // Convert the ROS image message to an OpenCV image
     cv::Mat cv_image = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8)->image;
     
